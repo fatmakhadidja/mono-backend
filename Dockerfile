@@ -1,26 +1,29 @@
-# Use a Java runtime as the base image
-FROM openjdk:17-jdk-slim
+# Stage 1: Build the jar
+FROM maven:3.9.3-eclipse-temurin-17 AS build
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy Maven build files first (for caching)
+# Copy pom.xml and wrapper first (for caching)
 COPY pom.xml .
 COPY mvnw .
 COPY .mvn .mvn
-RUN chmod +x mvnw
 
 # Copy source code
 COPY src ./src
 
-# Build the project
+# Build the jar
 RUN ./mvnw clean package -DskipTests
 
-# Copy the generated jar
-COPY target/*.jar app.jar
+# Stage 2: Run the jar
+FROM openjdk:17-jdk-slim
 
-# Expose port 8080 (Render will override with PORT env variable)
+WORKDIR /app
+
+# Copy jar from the build stage
+COPY --from=build /app/target/*.jar app.jar
+
+# Expose port
 EXPOSE 8080
 
-# Run the app using the assigned PORT
+# Run the app using Render's PORT env variable
 ENTRYPOINT ["sh", "-c", "java -jar app.jar --server.port=${PORT:-8080}"]
