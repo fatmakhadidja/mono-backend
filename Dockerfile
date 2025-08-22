@@ -8,6 +8,12 @@ COPY pom.xml .
 COPY mvnw .
 COPY .mvn .mvn
 
+# Make mvnw executable
+RUN chmod +x ./mvnw
+
+# Download dependencies (for better layer caching)
+RUN ./mvnw dependency:go-offline -B
+
 # Copy source code
 COPY src ./src
 
@@ -19,10 +25,19 @@ FROM openjdk:17-jdk-slim
 
 WORKDIR /app
 
+# Create a non-root user for security
+RUN groupadd -r spring && useradd -r -g spring spring
+
 # Copy jar from the build stage
 COPY --from=build /app/target/*.jar app.jar
 
-# Expose port
+# Change ownership of the jar file
+RUN chown spring:spring app.jar
+
+# Switch to non-root user
+USER spring
+
+# Expose port (this is mainly for documentation)
 EXPOSE 8080
 
 # Run the app using Render's PORT env variable
